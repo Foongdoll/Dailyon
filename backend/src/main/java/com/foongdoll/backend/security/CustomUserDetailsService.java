@@ -35,6 +35,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     // ==== Port & DTO (도메인 의존성 없이 간단히 정의) ====
     public interface UserQueryPort {
         Optional<UserView> findByUsername(String username);
+
     }
     public record UserView(Long id, String username, String encodedPassword, String nickName, Set<Role> roles, boolean enabled) {}
 }

@@ -9,7 +9,7 @@ export default function ProtectedRoute() {
   if (booting) return <div className="p-8 text-sm opacity-70">Preparing session…</div>;
 
   // 세션 없으면 로그인으로 이동. 이후 원래 위치 복귀를 위한 state 전달
-  if (!isAuthed) {
+  if (!isAuthed) {    
     return <Navigate to="/auth/login" replace state={{ from: loc.pathname + loc.search }} />;
   }
 

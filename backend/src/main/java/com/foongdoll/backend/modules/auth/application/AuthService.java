@@ -1,6 +1,7 @@
 package com.foongdoll.backend.modules.auth.application;
 
 
+import com.foongdoll.backend.common.api.LoginFailedException;
 import com.foongdoll.backend.common.error.DailyonException;
 import com.foongdoll.backend.common.error.ErrorCode;
 import com.foongdoll.backend.modules.auth.domain.dto.LoginRequest;
@@ -28,12 +29,15 @@ public class AuthService {
     private final JwtTokenProvider jwt;
 
     public TokenPair login(LoginRequest req) {
-        User user = userRepository.findByUsername(req.username())
-                .orElseThrow(() -> new DailyonException(ErrorCode.UNAUTHORIZED, "Invalid credentials"));
+        User user = userRepository.findByUsername(req.email())
+                .orElseThrow(() ->
+                        new LoginFailedException("아이디 혹은 비밀번호를 확인해주세요.")
+                );
 
         if (!user.isEnabled() || !passwordEncoder.matches(req.password(), user.getPassword())) {
-            throw new DailyonException(ErrorCode.UNAUTHORIZED, "Invalid credentials");
+            throw new LoginFailedException("아이디 혹은 비밀번호를 확인해주세요.");
         }
+
 
         Set<Role> roles = user.getRoles();
         String access = jwt.generateAccessToken(user.getId(), user.getUsername(), roles);

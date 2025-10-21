@@ -19,7 +19,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    /** 공개 로그인 엔드포인트 */
+    /** 로그인 엔드포인트 */
     @PostMapping("/public/login")
     public ResponseEntity<ApiResponse<TokenPair>> login(@RequestBody LoginRequest request) {
         TokenPair tokenPair = authService.login(request);
@@ -33,6 +33,7 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(tokenPair, MDC.get("traceId")));
     }
 
+    /** 회원가입 엔드포인트 */
     @PostMapping("/public/signup")
     public ResponseEntity<ApiResponse<TokenPair>> signup(@RequestBody SignupRequest request) {
         TokenPair tokenPair = authService.signup(request);

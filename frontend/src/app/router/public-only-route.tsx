@@ -7,6 +7,6 @@ export default function PublicOnlyRoute() {
 
   if (booting) return <div className="p-8 text-sm opacity-70">Preparing session…</div>;
   if (isAuthed) return <Navigate to="/" replace />;
-
+  
   return <Outlet />;
 }

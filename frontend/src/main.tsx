@@ -26,12 +26,10 @@ function Bootstrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+ReactDOM.createRoot(document.getElementById("root")!).render(  
     <Bootstrapper>
       <AppProviders>
         <RouterProvider router={router} />
       </AppProviders>
-    </Bootstrapper>
-  </React.StrictMode>
+    </Bootstrapper>  
 );
