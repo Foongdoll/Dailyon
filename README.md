@@ -163,17 +163,24 @@ Dailyon은 React 기반 웹앱을 **iOS / Android / Desktop** 환경 모두에�
 
 ## ⚙️ 8. 시스템 구조 및 모듈 구성
 
-### 8.1 백엔드 모듈 구조 (NestJS)
-| 모듈 | 역할 |
-|------|------|
-| **AuthModule** | 로그인, JWT 발급, Refresh Token, Role Guard |
-| **UserModule** | 회원 프로필, 환경설정 관리 |
-| **NoteModule** | 메모 CRUD, 템플릿, 버전 관리 |
-| **CalendarModule** | 일정 등록, 조회, 공유, 알림 |
-| **LedgerModule** | 가계부 CRUD 및 통계 리포트 |
-| **ChatModule** | WebSocket 채팅, 파일 전송, AI 대화 |
-| **AiModule** | Local/Cloud AI 라우팅, 캐싱, 요청 필터링 |
-| **CommonModule** | 공통 DTO, ExceptionFilter, 응답 통일 구조 |
+### 8.1 백엔드 모듈 구조 (Spring boot)
+| 모듈                     | 역할                                                           |
+| ---------------------- | ------------------------------------------------------------ |
+| **AuthModule**         | 로그인, JWT/Refresh 발급·회전, 로그인 이력                               |
+| **SecurityModule**     | Spring Security 설정, CORS, 인증/인가 필터, 익명 공유 링크 허용 경로 설정        |
+| **UserModule**         | 회원 프로필/환경설정, 사용자 검색(플래너 참여자 자동완성)                            |
+| **PlannerModule**      | 일정 CRUD, 범위 조회, 공유 토큰 발급/검증, 참여자 초대/동기화, 공개 조회 API           |
+| **NoteModule**         | 메모/문서 CRUD, 템플릿, 버전 관리                                       |
+| **CalendarModule**     | (선택) 일반 캘린더/루틴 관리(플래너와 분리 운용 시)                              |
+| **LedgerModule**       | 가계부 CRUD, 월별 통계/리포트                                          |
+| **ChatModule**         | WebSocket 채팅, 파일 전송, AI 연동 훅                                 |
+| **AiModule**           | 로컬/클라우드 LLM 라우팅, 캐싱, 요청 필터링                                  |
+| **FileModule**         | 파일 업로드(S3/로컬), 썸네일, 보안 정책                                    |
+| **NotificationModule** | 일정 알림(이메일/푸시), 구독 관리                                         |
+| **CommonModule**       | 공통 DTO/에러 핸들러(ExceptionHandler), 응답 통일(ResponseEnvelope), 유틸 |
+| **InfraModule**        | JPA/QueryDSL 설정, Flyway/Liquibase 마이그레이션, 외부 연동 설정           |
+| **MonitoringModule**   | Actuator, 로깅/Winston 대체(Logback), Sentry 등 관측성               |
+
 
 ---
 
