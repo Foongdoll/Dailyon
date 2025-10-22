@@ -1,11 +1,5 @@
 import { arrayMove } from "@dnd-kit/sortable";
-import {
-  ArrowDown,
-  ArrowUp,
-  Plus,
-  Settings2,
-  X,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
@@ -39,6 +33,14 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 
+// --- UI-only field with stable uid for React keys ---
+type UIField = NoteCategoryField & { uid: string };
+
+const mkUid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
 export default function CategoryManager({
   categories,
   open,
@@ -50,29 +52,37 @@ export default function CategoryManager({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [fields, setFields] = useState<NoteCategoryField[]>([]);
+  const [fields, setFields] = useState<UIField[]>([]);
 
+  // open or categories change → pick first or reset
   useEffect(() => {
     if (!open) return;
-    if (categories.length === 0) {
+    if (!categories.length) {
       resetForm();
-    } else if (selectedId == null) {
-      loadCategory(categories[0]);
+      return;
     }
+    if (selectedId == null) {
+      loadCategory(categories[0]);
+    } else {
+      const target = categories.find((c) => c.id === selectedId);
+      if (target) loadCategory(target);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, categories]);
 
+  // selectedId change → load that category
   useEffect(() => {
     if (!open) return;
-    const target = categories.find((category) => category.id === selectedId);
-    if (target) {
-      loadCategory(target);
-    }
-  }, [selectedId]);
+    if (selectedId == null) return;
+    const target = categories.find((c) => c.id === selectedId);
+    if (target) loadCategory(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, open]);
 
   const isEditing = selectedId != null;
 
   const sortedFields = useMemo(
-    () => fields.slice().sort((a, b) => a.orderIndex - b.orderIndex),
+    () => [...fields].sort((a, b) => a.orderIndex - b.orderIndex),
     [fields]
   );
 
@@ -81,9 +91,10 @@ export default function CategoryManager({
     setName(category.name);
     setDescription(category.description ?? "");
     setFields(
-      category.fields.slice().map((field, index) => ({
-        ...field,
-        orderIndex: index,
+      category.fields.map((f, i) => ({
+        ...f,
+        orderIndex: i,
+        uid: mkUid(), // stable per load to avoid re-mount on typing
       }))
     );
   };
@@ -95,20 +106,19 @@ export default function CategoryManager({
     setFields([]);
   };
 
-  const handleFieldChange = (
-    index: number,
-    key: keyof NoteCategoryField,
-    value: string | boolean
+  const handleFieldChange = <K extends keyof UIField>(
+    uid: string,
+    key: K,
+    value: UIField[K]
   ) => {
     setFields((prev) =>
-      prev.map((field, i) => {
-        if (i !== index) return field;
-        const next: NoteCategoryField = {
-          ...field,
-          [key]: key === "required" ? Boolean(value) : (value as string),
-          orderIndex: i,
+      prev.map((f) => {
+        if (f.uid !== uid) return f;
+        const next: UIField = {
+          ...f,
+          [key]: key === "required" ? Boolean(value) : (value as any),
         };
-        if (key === "label" && !field.key.trim()) {
+        if (key === "label" && !f.key.trim()) {
           next.key = slugify(String(value));
         }
         if (key === "key") {
@@ -123,6 +133,7 @@ export default function CategoryManager({
     setFields((prev) => [
       ...prev,
       {
+        uid: mkUid(),
         key: "",
         label: "",
         type: "TEXT",
@@ -132,14 +143,25 @@ export default function CategoryManager({
     ]);
   };
 
-  const removeField = (index: number) => {
-    setFields((prev) => prev.filter((_, i) => i !== index));
+  const removeField = (uid: string) => {
+    setFields((prev) =>
+      prev
+        .filter((f) => f.uid !== uid)
+        .map((f, i) => ({ ...f, orderIndex: i }))
+    );
   };
 
-  const moveField = (index: number, direction: -1 | 1) => {
+  const moveField = (uid: string, direction: -1 | 1) => {
     setFields((prev) => {
-      const next = arrayMove(prev, index, index + direction);
-      return next.map((field, i) => ({ ...field, orderIndex: i }));
+      const ordered = [...prev].sort((a, b) => a.orderIndex - b.orderIndex);
+      const idx = ordered.findIndex((f) => f.uid === uid);
+      const to = idx + direction;
+      if (idx < 0 || to < 0 || to >= ordered.length) return prev;
+      const moved = arrayMove(ordered, idx, to).map((f, i) => ({
+        ...f,
+        orderIndex: i,
+      }));
+      return moved;
     });
   };
 
@@ -152,10 +174,12 @@ export default function CategoryManager({
     const payload: CategoryPayload = {
       name: name.trim(),
       description: description.trim(),
-      fields: sortedFields.map((field, index) => ({
-        ...field,
-        key: field.key || slugify(field.label || `field_${index + 1}`),
-        orderIndex: index,
+      fields: sortedFields.map((f, i) => ({
+        key: f.key || slugify(f.label || `field_${i + 1}`),
+        label: f.label,
+        type: f.type,
+        required: f.required,
+        orderIndex: i,
       })),
     };
     if (isEditing && selectedId != null) {
@@ -176,7 +200,7 @@ export default function CategoryManager({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4 py-8">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/95 p-8 shadow-2xl shadow-black/60">
+      <div className="max-h-[90vh] w-full max-w-7xl overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/95 p-8 shadow-2xl shadow-black/60">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3 text-white">
             <Settings2 className="h-5 w-5" />
@@ -208,7 +232,7 @@ export default function CategoryManager({
                   className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${
                     selectedId === category.id
                       ? "bg-sky-500/10 text-sky-200"
-                      : "text-slate-300 hover:bg-white/5"
+                      : "text-slate-300 hover:bg:white/5"
                   }`}
                 >
                   {category.name}
@@ -219,7 +243,7 @@ export default function CategoryManager({
 
           <form
             onSubmit={handleSubmit}
-            className="space-y-6 rounded-2xl border border-white/10 bg-white/5 p-6"
+            className="space-y-6 rounded-2xl border border-white/10 bg:white/5 p-6"
           >
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm text-slate-300">
@@ -264,25 +288,33 @@ export default function CategoryManager({
 
                 {sortedFields.map((field, index) => (
                   <div
-                    key={`${field.key}-${index}`}
+                    key={field.uid}
                     className="grid gap-3 rounded-xl border border-white/10 bg-slate-900/70 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_120px_40px]"
                   >
                     <input
                       value={field.label}
-                      onChange={(e) => handleFieldChange(index, "label", e.target.value)}
+                      onChange={(e) =>
+                        handleFieldChange(field.uid, "label", e.target.value)
+                      }
                       placeholder="필드 이름"
                       className="rounded-lg border border-white/10 bg-slate-900/90 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
                     />
                     <input
                       value={field.key}
-                      onChange={(e) => handleFieldChange(index, "key", e.target.value)}
+                      onChange={(e) =>
+                        handleFieldChange(field.uid, "key", e.target.value)
+                      }
                       placeholder="키 (영문/숫자)"
                       className="rounded-lg border border-white/10 bg-slate-900/90 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
                     />
                     <select
                       value={field.type}
                       onChange={(e) =>
-                        handleFieldChange(index, "type", e.target.value as NoteFieldType)
+                        handleFieldChange(
+                          field.uid,
+                          "type",
+                          e.target.value as NoteFieldType
+                        )
                       }
                       className="rounded-lg border border-white/10 bg-slate-900/90 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
                     >
@@ -297,7 +329,7 @@ export default function CategoryManager({
                         type="checkbox"
                         checked={field.required}
                         onChange={(e) =>
-                          handleFieldChange(index, "required", e.target.checked)
+                          handleFieldChange(field.uid, "required", e.target.checked)
                         }
                         className="h-4 w-4 rounded border-white/20 bg-slate-800 text-sky-500 focus:ring-sky-400"
                       />
@@ -306,7 +338,7 @@ export default function CategoryManager({
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"
-                        onClick={() => moveField(index, -1)}
+                        onClick={() => moveField(field.uid, -1)}
                         disabled={index === 0}
                         className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 disabled:opacity-40"
                       >
@@ -314,7 +346,7 @@ export default function CategoryManager({
                       </button>
                       <button
                         type="button"
-                        onClick={() => moveField(index, 1)}
+                        onClick={() => moveField(field.uid, 1)}
                         disabled={index === sortedFields.length - 1}
                         className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 disabled:opacity-40"
                       >
@@ -322,7 +354,7 @@ export default function CategoryManager({
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeField(index)}
+                        onClick={() => removeField(field.uid)}
                         className="rounded-full border border-white/10 bg-white/5 p-2 text-rose-300 transition hover:bg-white/10"
                       >
                         <X className="h-3 w-3" />

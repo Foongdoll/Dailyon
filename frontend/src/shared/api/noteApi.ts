@@ -49,19 +49,33 @@ export async function fetchNote(id: number): Promise<Note> {
   return res.data;
 }
 
-export async function createNote(payload: NoteUpsertPayload): Promise<Note> {
-  const res = await request.post<ApiResponse<Note>>("/notes", {
-    ...payload,
+const buildNoteRequestBody = (payload: NoteUpsertPayload) => {
+  const body: Record<string, unknown> = {
+    category_id: payload.categoryId,
+    title: payload.title,
+    pinned: payload.pinned,
+    tags: payload.tags,
+    fields: payload.fields,
     layout: sanitizeLayout(payload.layout),
-  });
+  };
+
+  if (payload.content !== undefined) {
+    body.content = payload.content;
+  }
+  if (payload.color !== undefined) {
+    body.color = payload.color;
+  }
+
+  return body;
+};
+
+export async function createNote(payload: NoteUpsertPayload): Promise<Note> {
+  const res = await request.post<ApiResponse<Note>>("/notes", buildNoteRequestBody(payload));
   return res.data;
 }
 
 export async function updateNote(id: number, payload: NoteUpsertPayload): Promise<Note> {
-  const res = await request.put<ApiResponse<Note>>(`/notes/${id}`, {
-    ...payload,
-    layout: sanitizeLayout(payload.layout),
-  });
+  const res = await request.put<ApiResponse<Note>>(`/notes/${id}`, buildNoteRequestBody(payload));
   return res.data;
 }
 
@@ -70,9 +84,12 @@ export async function deleteNote(id: number): Promise<void> {
 }
 
 export async function updateNoteLayouts(payload: LayoutUpdatePayload[]): Promise<void> {
-  await request.patch<ApiResponse<void>>("/notes/layout", payload.map((item) => ({
-    noteId: item.noteId,
-    position: item.position,
-    layout: sanitizeLayout(item.layout),
-  })));
+  await request.patch<ApiResponse<void>>(
+    "/notes/layout",
+    payload.map((item) => ({
+      note_id: item.noteId,
+      position: item.position,
+      layout: sanitizeLayout(item.layout),
+    }))
+  );
 }

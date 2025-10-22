@@ -1,6 +1,6 @@
 import { request } from "../lib/axios";
 import type { ApiResponse } from "./types";
-import type { NoteCategory, NoteCategoryField } from "../types/note";
+import type { NoteCategory, NoteCategoryField, NoteFieldType } from "../types/note";
 
 export type CategoryPayload = {
   name: string;
@@ -8,13 +8,21 @@ export type CategoryPayload = {
   fields: NoteCategoryField[];
 };
 
-const mapFieldsForRequest = (fields: NoteCategoryField[]) =>
+type CategoryFieldRequestPayload = {
+  key: string;
+  label: string;
+  type: NoteFieldType;
+  required: boolean;
+  order_index: number;
+};
+
+const mapFieldsForRequest = (fields: NoteCategoryField[]): CategoryFieldRequestPayload[] =>
   fields.map((field, index) => ({
     key: field.key,
     label: field.label,
     type: field.type,
     required: field.required,
-    orderIndex: field.orderIndex ?? index,
+    order_index: field.orderIndex ?? index,
   }));
 
 export async function fetchCategories(): Promise<NoteCategory[]> {

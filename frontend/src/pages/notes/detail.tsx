@@ -55,6 +55,10 @@ export default function NoteDetail() {
 
   const updatedAt = note.updatedAt ? new Date(note.updatedAt).toLocaleString() : "-";
   const createdAt = note.createdAt ? new Date(note.createdAt).toLocaleString() : "-";
+  const accentColor =
+    typeof note.color === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(note.color)
+      ? note.color
+      : undefined;
 
   return (
     <section className="min-h-full bg-slate-950 px-6 py-10 text-slate-100">
@@ -66,10 +70,25 @@ export default function NoteDetail() {
           ← 목록으로
         </Link>
 
-        <article className="space-y-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-slate-950/40 backdrop-blur">
+        <article
+          className="space-y-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-slate-950/40 backdrop-blur"
+          style={
+            accentColor
+              ? {
+                  borderColor: `${accentColor}44`,
+                  boxShadow: `0 30px 80px -45px ${accentColor}`,
+                }
+              : undefined
+          }
+        >
           <header className="flex flex-col gap-4">
             <div>
-              <h1 className="text-3xl font-semibold text-white">{note.title}</h1>
+              <h1
+                className="text-3xl font-semibold text-white"
+                style={accentColor ? { color: accentColor } : undefined}
+              >
+                {note.title}
+              </h1>
               <p className="mt-1 text-sm text-slate-400">{category?.name ?? "개인 노트"}</p>
               <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-400">
                 <span className="inline-flex items-center gap-1">
@@ -86,8 +105,16 @@ export default function NoteDetail() {
                   <span
                     key={tag}
                     className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-200"
+                    style={
+                      accentColor
+                        ? { borderColor: `${accentColor}40`, background: `${accentColor}12`, color: accentColor }
+                        : undefined
+                    }
                   >
-                    <Tag className="h-3 w-3 text-sky-300" />
+                    <Tag
+                      className="h-3 w-3"
+                      style={accentColor ? { color: accentColor } : undefined}
+                    />
                     #{tag}
                   </span>
                 ))}

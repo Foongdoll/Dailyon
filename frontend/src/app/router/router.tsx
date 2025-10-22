@@ -9,6 +9,8 @@ const HomePage    = lazy(() => import("../../pages/home"));
 const NotesPage   = lazy(() => import("../../pages/notes"));
 const NoteDetail  = lazy(() => import("../../pages/notes/detail"));
 const PlannerPage = lazy(() => import("../../pages/planner"));
+const PlannerDayPage = lazy(() => import("../../pages/planner/day"));
+const PlannerSharePage = lazy(() => import("../../pages/planner/share"));
 const LedgerPage  = lazy(() => import("../../pages/ledger"));
 const ChatPage    = lazy(() => import("../../pages/chat"));
 const LoginPage   = lazy(() => import("../../pages/auth/login"));
@@ -38,6 +40,7 @@ export const router = createBrowserRouter([
           { path: "notes", element: withSuspense(<NotesPage />) },
           { path: "notes/:id", element: withSuspense(<NoteDetail />) },
           { path: "planner", element: withSuspense(<PlannerPage />) },
+          { path: "planner/:date", element: withSuspense(<PlannerDayPage />) },
           { path: "ledger", element: withSuspense(<LedgerPage />) },
           { path: "chat", element: withSuspense(<ChatPage />) },
         ],
@@ -51,6 +54,7 @@ export const router = createBrowserRouter([
         ],
       },
       // 기타
+      { path: "planner/share/:code", element: withSuspense(<PlannerSharePage />) },
       { path: "404", element: withSuspense(<NotFound />) },
       { path: "*", element: <Navigate to="/404" replace /> },
     ],

@@ -1,4 +1,6 @@
 import axios, { AxiosError, type AxiosInstance, type AxiosResponse } from "axios";
+import { refreshRequest } from "../api/authApi";
+import { useAuthStore } from "../store/auth";
 
 // ✅ 환경변수 기반 (Vite 기준)
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -16,7 +18,7 @@ const api: AxiosInstance = axios.create({
 /** 요청 인터셉터 */
 api.interceptors.request.use(
     (config: any) => {
-        const token = localStorage.getItem("access_token");
+        const token = useAuthStore.getState().accessToken;
         if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -25,29 +27,67 @@ api.interceptors.request.use(
     (error: AxiosError) => Promise.reject(error)
 );
 
+let refreshPromise: Promise<string | null> | null = null;
+
+const logout = () => {
+    const { clear, setBooting } = useAuthStore.getState();
+    clear();
+    setBooting(false);
+};
+
 /** 응답 인터셉터 */
 api.interceptors.response.use(
     (response: AxiosResponse) => response.data,
     async (error: AxiosError) => {
-        if (error.response) {
-            console.log(error.response)
-            const { status } = error.response;
+        const response = error.response;
+        const originalRequest: any = error.config ?? {};
 
-            // 🔒 토큰 만료 시 처리
-            if (status === 401) {
-                console.warn("토큰 만료. 재로그인 필요.");
-                localStorage.removeItem("access_token");
-                // window.location.href = "/login";
+        if (response?.status === 401) {
+            if (!originalRequest._retry) {
+                originalRequest._retry = true;
+                const { refreshToken, setTokens } = useAuthStore.getState();
+
+                if (refreshToken) {
+                    if (!refreshPromise) {
+                        refreshPromise = refreshRequest(refreshToken)
+                            .then((pair) => {
+                                setTokens(pair.accessToken, pair.refreshToken);
+                                return pair.accessToken;
+                            })
+                            .catch(() => {
+                                logout();
+                                return null;
+                            })
+                            .finally(() => {
+                                refreshPromise = null;
+                            });
+                    }
+
+                    const newToken = await refreshPromise;
+                    if (newToken) {
+                        originalRequest.headers = originalRequest.headers ?? {};
+                        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                        return api(originalRequest);
+                    }
+                }
             }
+
+            logout();
         }
+
         return Promise.reject(error);
     }
 );
 
 export const request = {
-    get: <T = any>(url: string, params?: any) => api.get<T>(url, { params }),
-    post: <T = any>(url: string, data?: any) => api.post<T>(url, data),
-    put: <T = any>(url: string, data?: any) => api.put<T>(url, data),
-    patch: <T = any>(url: string, data?: any) => api.patch<T>(url, data),
-    delete: <T = any>(url: string) => api.delete<T>(url),
+    get: <T = unknown>(url: string, params?: Record<string, unknown>) =>
+        api.get<T>(url, { params }).then((res) => res as T),
+    post: <T = unknown>(url: string, data?: unknown) =>
+        api.post<T>(url, data).then((res) => res as T),
+    put: <T = unknown>(url: string, data?: unknown) =>
+        api.put<T>(url, data).then((res) => res as T),
+    patch: <T = unknown>(url: string, data?: unknown) =>
+        api.patch<T>(url, data).then((res) => res as T),
+    delete: <T = unknown>(url: string) =>
+        api.delete<T>(url).then((res) => res as T),
 };

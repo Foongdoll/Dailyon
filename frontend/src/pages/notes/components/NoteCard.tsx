@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Pin, Trash2 } from "lucide-react";
 import type { Note, NoteCategoryField } from "../../../shared/types/note";
 
 export type SortableNoteCardProps = {
@@ -32,9 +32,23 @@ export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNot
     isDragging,
   } = useSortable({ id: note.id });
 
-  const style: React.CSSProperties = {
+  const baseStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  const accentColor =
+    typeof note.color === "string" && /^#([0-9a-f]{3,8})$/i.test(note.color)
+      ? note.color
+      : undefined;
+
+  const style: React.CSSProperties = {
+    ...baseStyle,
+    borderColor: accentColor ? `${accentColor}33` : undefined,
+    background: accentColor
+      ? `linear-gradient(135deg, ${accentColor}24, rgba(15,23,42,0.92))`
+      : undefined,
+    boxShadow: accentColor ? `0 20px 48px -30px ${accentColor}` : undefined,
   };
 
   return (
@@ -46,9 +60,24 @@ export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNot
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-white">{note.title}</h2>
-          <p className="mt-1 text-xs text-slate-400">
+        <div className="space-y-1.5">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+            {accentColor ? (
+              <span
+                className="inline-flex h-2.5 w-2.5 rounded-full"
+                style={{ background: accentColor }}
+                aria-hidden
+              />
+            ) : null}
+            {note.title}
+            {note.pinned ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
+                <Pin className="h-3 w-3" />
+                고정
+              </span>
+            ) : null}
+          </h2>
+          <p className="text-xs text-slate-400">
             {note.categoryName} ·{" "}
             {note.updatedAt ? new Date(note.updatedAt).toLocaleString() : "작성 중"}
           </p>
@@ -81,7 +110,7 @@ export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNot
       </div>
 
       {note.content ? (
-        <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-300">{note.content}</p>
+        <p className="whitespace-pre-wrap mt-3 line-clamp-3 text-sm leading-relaxed text-slate-300">{note.content}</p>
       ) : null}
 
       <ul className="mt-4 space-y-2 text-xs text-slate-200">
@@ -94,7 +123,12 @@ export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNot
             return (
               <li
                 key={field.key}
-                className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/5 px-3 py-2"
+                style={
+                  accentColor
+                    ? { borderColor: `${accentColor}30`, background: `${accentColor}12` }
+                    : undefined
+                }
+                className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition"
               >
                 <span className="text-slate-400">{field.label}</span>
                 <span className="font-medium text-white">{formatFieldValue(field, raw)}</span>
@@ -108,7 +142,12 @@ export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNot
           {note.tags.map((tag) => (
             <span
               key={tag}
-              className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-200"
+              style={
+                accentColor
+                  ? { borderColor: `${accentColor}3d`, background: `${accentColor}10`, color: accentColor }
+                  : undefined
+              }
+              className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-200 transition"
             >
               #{tag}
             </span>

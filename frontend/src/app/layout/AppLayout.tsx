@@ -209,6 +209,7 @@ function Hero() {
   );
 }
 
+
 export default memo(function AppLayout() {
   const { pathname } = useLocation();
   const showHero = useMemo(() => pathname === "/" || pathname === "", [pathname]);

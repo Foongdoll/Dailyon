@@ -50,6 +50,12 @@ export default function NoteDialog({
   const [tags, setTags] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
 
+  const accentColor =
+    typeof color === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color)
+      ? color
+      : undefined;
+  const normalizedColor = accentColor ?? "#1E40AF";
+
   useEffect(() => {
     if (!open) return;
     setTitle(note?.title ?? "");
@@ -144,7 +150,17 @@ export default function NoteDialog({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 py-8">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/95 p-8 shadow-2xl shadow-black/60">
+      <div
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/95 p-8 shadow-2xl shadow-black/60"
+        style={
+          accentColor
+            ? {
+                borderColor: `${accentColor}44`,
+                boxShadow: `0 30px 60px -35px ${accentColor}`,
+              }
+            : undefined
+        }
+      >
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-semibold text-white">
             {note ? "노트 수정" : "새 노트 작성"}
@@ -169,13 +185,21 @@ export default function NoteDialog({
               />
             </label>
             <label className="space-y-2 text-sm text-slate-300">
-              <span>색상 코드 (선택)</span>
-              <input
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                placeholder="#1E90FF"
-                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
-              />
+              <span>노트 색상 (선택)</span>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={normalizedColor}
+                  onChange={(e) => setColor(e.target.value.toUpperCase())}
+                  className="h-11 w-11 cursor-pointer rounded-lg border border-white/10 bg-slate-900/80 p-1"
+                />
+                <input
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  placeholder="#1E90FF"
+                  className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
+                />
+              </div>
             </label>
           </div>
 
@@ -186,7 +210,7 @@ export default function NoteDialog({
               onChange={(e) => setContent(e.target.value)}
               rows={4}
               placeholder="노트 내용을 입력하세요."
-              className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
+              className="whitespace-pre-wrap w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
             />
           </label>
 
@@ -211,7 +235,10 @@ export default function NoteDialog({
           </label>
 
           <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-semibold text-white">
+            <h3
+              className="text-sm font-semibold text-white"
+              style={accentColor ? { color: accentColor } : undefined}
+            >
               {category.name} 필드 입력
             </h3>
             {fields.length === 0 ? (

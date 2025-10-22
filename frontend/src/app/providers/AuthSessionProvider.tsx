@@ -1,119 +1,157 @@
 import React from "react";
+import { refreshRequest, type TokenPair } from "../../shared/api/authApi";
+import { useAuthStore } from "../../shared/store/auth";
 
-type TokenPair = { accessToken: string; refreshToken: string };
 type AuthCtx = {
   booting: boolean;
   isAuthed: boolean;
   accessToken: string | null;
   refreshToken: string | null;
-  setTokens: (t: TokenPair | null) => void;
+  setTokens: (pair: TokenPair | null) => void;
   logout: () => void;
   ensureFreshAccessToken: () => Promise<string | null>;
 };
+
 const AuthContext = React.createContext<AuthCtx | null>(null);
 
-const ACCESS_KEY = "dailyon.access";
-const REFRESH_KEY = "dailyon.refresh";
+const REFRESH_MARGIN_SECONDS = 15;
 
-// --- 간단한 토큰 만료여부 판단 (JWT exp)
 function isExpired(jwt: string): boolean {
   try {
     const payload = JSON.parse(atob(jwt.split(".")[1]));
     if (!payload.exp) return false;
     const nowSec = Math.floor(Date.now() / 1000);
-    return payload.exp - 15 <= nowSec; // 15초 여유
+    return payload.exp - REFRESH_MARGIN_SECONDS <= nowSec;
   } catch {
     return false;
   }
 }
 
-async function refreshToken(refreshToken: string): Promise<TokenPair | null> {
-  try {
-    const res = await fetch("/api/public/refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken })
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    // ApiResponse 규격: { success, data: { accessToken, refreshToken } }
-    if (data?.success && data?.data?.accessToken && data?.data?.refreshToken) {
-      return { accessToken: data.data.accessToken, refreshToken: data.data.refreshToken };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 export default function AuthSessionProvider({ children }: { children: React.ReactNode }) {
-  const [booting, setBooting] = React.useState(true);
-  const [accessToken, setAccess] = React.useState<string | null>(null);
-  const [refresh, setRefresh] = React.useState<string | null>(null);
+  const booting = useAuthStore((s) => s.booting);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const refreshToken = useAuthStore((s) => s.refreshToken);
+  const setTokensState = useAuthStore((s) => s.setTokens);
+  const clearState = useAuthStore((s) => s.clear);
 
-  const setTokens = React.useCallback((pair: TokenPair | null) => {
-    if (pair) {
-      setAccess(pair.accessToken);
-      setRefresh(pair.refreshToken);
-      localStorage.setItem(ACCESS_KEY, pair.accessToken);
-      localStorage.setItem(REFRESH_KEY, pair.refreshToken);
-    } else {
-      setAccess(null);
-      setRefresh(null);
-      localStorage.removeItem(ACCESS_KEY);
-      localStorage.removeItem(REFRESH_KEY);
-    }
-  }, []);
+  const refreshInFlight = React.useRef<Promise<string | null> | null>(null);
 
-  const logout = React.useCallback(() => setTokens(null), [setTokens]);
+  const setTokens = React.useCallback(
+    (pair: TokenPair | null) => {
+      if (pair) {
+        setTokensState(pair.accessToken, pair.refreshToken);
+      } else {
+        clearState();
+      }
+    },
+    [clearState, setTokensState]
+  );
+
+  const logout = React.useCallback(() => {
+    clearState();
+  }, [clearState]);
 
   const ensureFreshAccessToken = React.useCallback(async () => {
-    if (!accessToken && !refresh) return null;
-    // access 만료 시 refresh 시도
-    if (accessToken && !isExpired(accessToken)) return accessToken;
-    if (!refresh) return null;
+    const store = useAuthStore.getState();
+    const currentAccess = store.accessToken;
+    if (currentAccess && !isExpired(currentAccess)) {
+      return currentAccess;
+    }
 
-    const next = await refreshToken(refresh);
-    if (next) {
-      setTokens(next);
-      return next.accessToken;
-    } else {
-      setTokens(null);
+    const currentRefresh = store.refreshToken;
+    if (!currentRefresh) {
+      store.clear();
       return null;
     }
-  }, [accessToken, refresh, setTokens]);
 
-  // 부팅: localStorage 복원 + 만료 시 refresh 1회 시도
+    if (!refreshInFlight.current) {
+      refreshInFlight.current = (async () => {
+        try {
+          const next = await refreshRequest(currentRefresh);
+          store.setTokens(next.accessToken, next.refreshToken);
+          return next.accessToken;
+        } catch {
+          store.clear();
+          return null;
+        } finally {
+          refreshInFlight.current = null;
+        }
+      })();
+    }
+
+    return refreshInFlight.current;
+  }, []);
+
   React.useEffect(() => {
-    (async () => {
-      const a = localStorage.getItem(ACCESS_KEY);
-      const r = localStorage.getItem(REFRESH_KEY);
-      if (a) setAccess(a);
-      if (r) setRefresh(r);
+    let cancelled = false;
 
-      if (a && !isExpired(a)) {
-        // OK
-      } else if (r) {
-        const next = await refreshToken(r);
-        if (next) setTokens(next);
+    const hydrateAndRefresh = async () => {
+      const store = useAuthStore.getState();
+      try {
+        const { accessToken: currentAccess, refreshToken: currentRefresh } = store;
+        if (currentAccess && !isExpired(currentAccess)) {
+          return;
+        }
+        if (currentRefresh) {
+          const next = await refreshRequest(currentRefresh);
+          if (cancelled) return;
+          store.setTokens(next.accessToken, next.refreshToken);
+        } else {
+          store.clear();
+        }
+      } catch {
+        if (!cancelled) {
+          store.clear();
+        }
+      } finally {
+        if (!cancelled) {
+          store.setBooting(false);
+        }
       }
-      setBooting(false);
-    })();
-  }, [setTokens]);
+    };
 
-  const value: AuthCtx = {
-    booting,
-    isAuthed: !!accessToken,
-    accessToken,
-    refreshToken: refresh,
-    setTokens,
-    logout,
-    ensureFreshAccessToken
-  };
+    const persistApi = useAuthStore.persist;
+    if (!persistApi) {
+      hydrateAndRefresh();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (persistApi.hasHydrated?.()) {
+      hydrateAndRefresh();
+    } else {
+      const unsubscribe = persistApi.onFinishHydration?.(() => {
+        hydrateAndRefresh();
+      });
+      return () => {
+        cancelled = true;
+        unsubscribe?.();
+      };
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const value = React.useMemo<AuthCtx>(
+    () => ({
+      booting,
+      isAuthed: !!accessToken,
+      accessToken,
+      refreshToken,
+      setTokens,
+      logout,
+      ensureFreshAccessToken,
+    }),
+    [accessToken, booting, ensureFreshAccessToken, logout, refreshToken, setTokens]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const ctx = React.useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthSessionProvider");

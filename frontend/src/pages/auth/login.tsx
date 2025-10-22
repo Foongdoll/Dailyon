@@ -4,18 +4,6 @@ import { toast } from "sonner";
 import { loginRequest } from "../../shared/api/authApi";
 import { useAuthStore } from "../../shared/store/auth";
 
-/*
-        String accessToken,
-        String refreshToken,
-        String tokenType
-*/
-
-export type TokenPair = {
-  accessToken: string;
-  refreshToken: string;
-  tokenType: string;
-};
-
 export default function Login() {
   const navigate = useNavigate();
   const setTokens = useAuthStore((s) => s.setTokens);
@@ -40,6 +28,7 @@ export default function Login() {
 
     try {
       const res = await loginRequest({ email, password });
+
       setTokens(res.accessToken, res.refreshToken);
       setBooting(false);
 

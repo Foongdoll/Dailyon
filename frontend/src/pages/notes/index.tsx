@@ -191,7 +191,7 @@ export default function NotesIndex() {
     categoriesQuery.isLoading || notesQuery.isLoading || notesQuery.isRefetching;
 
   return (
-    <section className="min-h-full bg-slate-950 px-6 py-10 text-slate-100">
+    <section className="min-h-full bg-gradient-to-br from-slate-950 via-slate-950/95 to-slate-950 px-6 py-10 text-slate-100">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-6 rounded-3xl border border-slate-800 bg-slate-900/60 p-8 shadow-lg shadow-slate-950/40 backdrop-blur">
           <div className="flex flex-col gap-2">
@@ -218,8 +218,9 @@ export default function NotesIndex() {
                 onChange={(e) => setSelectedCategoryId(Number(e.target.value))}
                 className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-sky-500 focus:outline-none"
               >
+                <option className="text-black" value={0}>- 선택 -</option>
                 {categoriesQuery.data?.map((category) => (
-                  <option key={category.id} value={category.id}>
+                  <option className="text-black" key={category.id} value={category.id}>
                     {category.name}
                   </option>
                 ))}
@@ -245,6 +246,27 @@ export default function NotesIndex() {
             </button>
           </div>
         </header>
+
+        {selectedCategory ? (
+          <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-5 text-sm text-slate-300 shadow-inner shadow-black/30">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">선택한 카테고리</p>
+                <p className="text-base font-semibold text-white">{selectedCategory.name}</p>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <span className="rounded-full border border-white/10 px-3 py-1">
+                  필드 {selectedCategory.fields.length}개
+                </span>
+                {selectedCategory.description ? (
+                  <span className="max-w-[360px] truncate text-slate-400">
+                    {selectedCategory.description}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {isLoading ? (
           <div className="flex min-h-[240px] items-center justify-center text-slate-400">
