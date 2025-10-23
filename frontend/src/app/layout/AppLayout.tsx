@@ -215,12 +215,12 @@ export default memo(function AppLayout() {
   const showHero = useMemo(() => pathname === "/" || pathname === "", [pathname]);
 
   return (
-    <div className="bg-slate-950 text-slate-100 h-screen">
+    <div className="bg-slate-950 text-slate-100 min-h-dvh">
       <Header />
       {/* 메인 그리드 */}
       <div className="flex">
         <Sidebar />
-        <main id="content" className="flex-1 h-[60%]">
+        <main id="content" className="flex min-h-[calc(100dvh-56px)] flex-1 flex-col overflow-y-auto">
           {showHero && <Hero />}
           <div className="px-4 py-6">
             <Outlet />

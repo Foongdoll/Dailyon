@@ -29,25 +29,25 @@ public class PlannerEventController {
         if (endDate.isBefore(startDate)) {
             throw new DailyonException(ErrorCode.VALIDATION_ERROR, "날짜 범위가 올바르지 않습니다.");
         }
-        Long userId = requireUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         var events = plannerEventService.getRange(userId, startDate, endDate).stream()
                 .map(event -> PlannerDtos.PlannerEventResponse.from(event, userId))
                 .toList();
-        return ApiResponse.ok(events, traceId());
+        return ApiResponse.ok(events, SecurityUtils.traceId());
     }
 
     @GetMapping("/{eventId}")
     public ApiResponse<PlannerDtos.PlannerEventResponse> detail(@PathVariable Long eventId) {
-        Long userId = requireUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         var event = plannerEventService.getAccessible(userId, eventId);
-        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), traceId());
+        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), SecurityUtils.traceId());
     }
 
     @PostMapping
     public ApiResponse<PlannerDtos.PlannerEventResponse> create(@RequestBody PlannerDtos.PlannerEventRequest request) {
-        Long userId = requireUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         var event = plannerEventService.create(userId, request);
-        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), traceId());
+        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), SecurityUtils.traceId());
     }
 
     @PutMapping("/{eventId}")
@@ -55,16 +55,16 @@ public class PlannerEventController {
             @PathVariable Long eventId,
             @RequestBody PlannerDtos.PlannerEventRequest request
     ) {
-        Long userId = requireUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         var event = plannerEventService.update(userId, eventId, request);
-        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), traceId());
+        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), SecurityUtils.traceId());
     }
 
     @DeleteMapping("/{eventId}")
     public ApiResponse<Void> delete(@PathVariable Long eventId) {
-        Long userId = requireUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         plannerEventService.delete(userId, eventId);
-        return ApiResponse.ok(traceId());
+        return ApiResponse.ok(SecurityUtils.traceId());
     }
 
     @PostMapping("/{eventId}/share")
@@ -72,20 +72,9 @@ public class PlannerEventController {
             @PathVariable Long eventId,
             @RequestBody PlannerDtos.ShareToggleRequest request
     ) {
-        Long userId = requireUserId();
-        var event = plannerEventService.toggleShare(userId, eventId, request.shared());
-        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), traceId());
-    }
-
-    private Long requireUserId() {
         Long userId = SecurityUtils.getCurrentUserId();
-        if (userId == null) {
-            throw new DailyonException(ErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
-        }
-        return userId;
+        var event = plannerEventService.toggleShare(userId, eventId, request.shared());
+        return ApiResponse.ok(PlannerDtos.PlannerEventResponse.from(event, userId), SecurityUtils.traceId());
     }
 
-    private String traceId() {
-        return MDC.get("traceId");
-    }
 }

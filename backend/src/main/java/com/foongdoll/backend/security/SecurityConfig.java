@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/planner/public/**").permitAll()
                         .requestMatchers("/api/planner/**").hasRole(Role.USER.name())
                         .requestMatchers("/api/notes/**").hasRole(Role.USER.name())
+                        .requestMatchers("/api/ledger/**").hasRole(Role.USER.name())
                         // OPTIONS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // 파일 공개 리소스 등 필요 시 추가
