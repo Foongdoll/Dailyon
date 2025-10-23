@@ -1,6 +1,6 @@
 // src/app/layout/AppLayout.tsx
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   NotebookText,
@@ -67,7 +67,7 @@ function Header() {
         {/* Search */}
         <div className="ml-4 hidden min-w-[220px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/70 ring-1 ring-white/0 transition-all hover:bg-white/10 md:flex">
           <Search className="h-4 w-4" />
-          <input type="text" placeholder="검색"/>
+          <input type="text" placeholder="검색" />
         </div>
       </div>
     </header>
@@ -118,6 +118,26 @@ function Sidebar() {
 
 /** 홈 히어로 섹션 (Inpa 감성) */
 function Hero() {
+  const fullText = "Hello World! Let's Get it" ;  
+  const [displayedText, setDisplayedText] = useState("");
+  const [typingDone, setTypingDone] = useState(false);
+
+  // 타이핑 효과
+  useEffect(() => {
+    let i = 0;    
+        
+    const interval = setInterval(() => {
+      i++;
+      setDisplayedText(fullText.slice(0, i));
+      if (i === fullText.length) {
+        
+        clearInterval(interval);
+        setTypingDone(true);
+      }
+    }, 100); // 속도 조절
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <section className="relative isolate">
       {/* 배경 이미지 */}
@@ -149,10 +169,17 @@ function Hero() {
           transition={{ delay: 0.05, duration: 0.7 }}
           className="text-5xl font-extrabold leading-tight md:text-6xl"
         >
-          Hello World!
           <br />
-          <span className="text-white/90">Let&apos;s Get it</span>
-          <span className="align-top text-sky-300"> |</span>
+          <span className="text-white/90">{displayedText}</span>
+          {/* 고정폭 커서: 조건부 렌더링 X, 항상 자리 유지 */}
+          <span
+            className={
+              "align-top inline-block w-[0.6ch] text-sky-300 " +
+              (typingDone ? "blink-caret" : "opacity-100")
+            }
+          >
+            |
+          </span>
         </motion.h1>
 
         <motion.p
@@ -161,29 +188,39 @@ function Hero() {
           transition={{ delay: 0.15, duration: 0.7 }}
           className="mt-6 max-w-2xl text-base text-white/80"
         >
-          안녕 세계! 나에게 프로그래밍 세상을 보여줘서 고마워.
+          자신만의 공간에 기록해요.
         </motion.p>
 
-      <a href="#content" className="mt-10 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/90 transition-colors hover:bg-white/20">
+        <a
+          href="#content"
+          className="mt-10 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/90 transition-colors hover:bg-white/20"
+        >
           <ChevronDown className="h-4 w-4" />
           Scroll
         </a>
       </div>
+
+      {/* 커서 깜빡임 키프레임 (레이아웃 영향 없이 opacity만 변경) */}
+      <style>{`
+        @keyframes blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+        .blink-caret { animation: blink 1s steps(1, end) infinite; }
+      `}</style>
     </section>
   );
 }
+
 
 export default memo(function AppLayout() {
   const { pathname } = useLocation();
   const showHero = useMemo(() => pathname === "/" || pathname === "", [pathname]);
 
   return (
-    <div className="bg-slate-950 text-slate-100 h-screen">
+    <div className="bg-slate-950 text-slate-100 min-h-dvh">
       <Header />
       {/* 메인 그리드 */}
       <div className="flex">
         <Sidebar />
-        <main id="content" className="flex-1 h-[60%]">
+        <main id="content" className="flex min-h-[calc(100dvh-56px)] flex-1 flex-col overflow-y-auto">
           {showHero && <Hero />}
           <div className="px-4 py-6">
             <Outlet />

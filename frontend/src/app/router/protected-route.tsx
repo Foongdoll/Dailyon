@@ -7,7 +7,7 @@ export default function ProtectedRoute() {
   const loc = useLocation();
 
   if (booting) return <div className="p-8 text-sm opacity-70">Preparing session…</div>;
-  
+
   if (!isAuthed) {    
     return <Navigate to="/auth/login" replace state={{ from: loc.pathname + loc.search }} />;
   }

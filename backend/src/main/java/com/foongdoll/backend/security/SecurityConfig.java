@@ -49,6 +49,10 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         // Auth Public APIs (로그인/회원가입/토큰리프레시 등)
                         .requestMatchers("/api/auth/public/**").permitAll()
+                        .requestMatchers("/api/planner/public/**").permitAll()
+                        .requestMatchers("/api/planner/**").hasRole(Role.USER.name())
+                        .requestMatchers("/api/notes/**").hasRole(Role.USER.name())
+                        .requestMatchers("/api/ledger/**").hasRole(Role.USER.name())
                         // OPTIONS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // 파일 공개 리소스 등 필요 시 추가

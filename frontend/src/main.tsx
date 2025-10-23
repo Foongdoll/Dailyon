@@ -10,12 +10,20 @@ function Bootstrapper({ children }: { children: React.ReactNode }) {
   // 앱 시작 시 세션 복원
   React.useEffect(() => {
     const { setBooting, setTokens } = useAuthStore.getState();
+    if (typeof window === "undefined") {
+      setBooting(false);
+      return;
+    }
+
     (async () => {
       try {
-        const a = localStorage.getItem("accessToken");
-        const r = localStorage.getItem("refreshToken");
-        if (a && r) {
-          setTokens(a, r);
+        const access =
+          localStorage.getItem("access_token") ?? localStorage.getItem("accessToken");
+        const refresh =
+          localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken");
+
+        if (access && refresh) {
+          setTokens(access, refresh);
           // 필요시 /public/refresh 호출해서 갱신 로직 수행
         }
       } finally {

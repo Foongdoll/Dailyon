@@ -4,31 +4,20 @@ import { toast } from "sonner";
 import { loginRequest } from "../../shared/api/authApi";
 import { useAuthStore } from "../../shared/store/auth";
 
-/*
-        String accessToken,
-        String refreshToken,
-        String tokenType
-*/
-
-export type TokenPair = {
-  access_Token: string,
-  refresh_Token: string,
-  token_Type: string
-}
-
 export default function Login() {
   const navigate = useNavigate();
-  const { setTokens } = useAuthStore();
+  const setTokens = useAuthStore((s) => s.setTokens);
+  const setBooting = useAuthStore((s) => s.setBooting);
 
   const { email, setEmail, password, setPassword } = useAuth();
-  const usernameRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const passwordRegex =
     /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s])\S{8,64}$/;
 
 
   const onSubmit = async () => {
-    if (!usernameRegex.test(email)) {
-      toast.error("아이디는 영문 소문자로 시작하며 4~20자의 영문, 숫자, 언더스코어만 사용할 수 있습니다.");
+    if (!emailRegex.test(email)) {
+      toast.error("이메일 형식이 올바르지 않습니다.");
       return;
     }
 
@@ -39,11 +28,9 @@ export default function Login() {
 
     try {
       const res = await loginRequest({ email, password });
-      console.log(res);
-      localStorage.setItem("access_token", res.access_Token);
-      localStorage.setItem("refresh_token", res.refresh_Token);
 
-      setTokens(res.access_Token, res.refresh_Token)
+      setTokens(res.accessToken, res.refreshToken);
+      setBooting(false);
 
       toast.success("로그인 성공!");
       navigate("/");
