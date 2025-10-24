@@ -59,6 +59,12 @@ const DEFAULTS_BY_ORIENTATION: Record<SheetOrientation, { rows: number; cols: nu
 
 type CellValue = {
   value: string;
+  valueType: string | null;
+  formula: string | null;
+  valueCalc: string | null;
+  formatJson: string | null;
+  styleJson: string | null;
+  note: string | null;
 };
 
 type WorkingSheet = {
@@ -81,17 +87,26 @@ type SheetFilterState = {
   query: string;
 };
 
+type SheetImportCell = {
+  rowIndex: number;
+  colIndex: number;
+  value?: string | number | null;
+  valueRaw?: string | number | null;
+  valueType?: string | null;
+  formula?: string | null;
+  valueCalc?: string | number | null;
+  formatJson?: string | null;
+  styleJson?: string | null;
+  note?: string | null;
+};
+
 type SheetImportPayload = {
   title?: string;
   description?: string;
   orientation?: SheetOrientation;
   rowCount?: number;
   columnCount?: number;
-  cells?: Array<{
-    rowIndex: number;
-    colIndex: number;
-    value: string;
-  }>;
+  cells?: SheetImportCell[];
 };
 
 const cellKey = (row: number, col: number) => `${row}:${col}`;
@@ -117,28 +132,107 @@ const columnLabel = (index: number) => {
 
 const cloneWorking = (state: WorkingSheet): WorkingSheet => ({
   meta: { ...state.meta },
-  cells: Object.fromEntries(
-    Object.entries(state.cells).map(([key, cell]) => [key, { ...cell }])
-  ),
+  cells: Object.fromEntries(Object.entries(state.cells).map(([key, cell]) => [key, { ...cell }])),
 });
+
+const createEmptyCellValue = (): CellValue => ({
+  value: "",
+  valueType: null,
+  formula: null,
+  valueCalc: null,
+  formatJson: null,
+  styleJson: null,
+  note: null,
+});
+
+const coerceToString = (value: unknown): string => (value == null ? "" : String(value));
+
+const coerceNullableString = (value: unknown): string | null =>
+  value == null ? null : String(value);
+
+const inferValueType = (raw: string | null | undefined): string | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  if (trimmed.startsWith("=")) return "formula";
+  return Number.isFinite(Number(trimmed)) ? "number" : "text";
+};
+
+const hasPersistentMetadata = (cell?: CellValue): boolean =>
+  Boolean(cell && (cell.styleJson || cell.formatJson || cell.note || cell.formula));
+
+const applyValueToCell = (cell: CellValue | undefined, nextValue: string): CellValue | undefined => {
+  const normalized = coerceToString(nextValue);
+  const trimmed = normalized.trim();
+  if (trimmed === "" && !hasPersistentMetadata(cell)) {
+    return undefined;
+  }
+  const next = cell ? { ...cell } : createEmptyCellValue();
+  next.value = normalized;
+  if (trimmed === "") {
+    next.valueType = null;
+    next.formula = null;
+    next.valueCalc = null;
+  } else {
+    const inferred = inferValueType(normalized);
+    if (inferred === "formula") {
+      next.valueType = "formula";
+      next.formula = normalized;
+      next.valueCalc = null;
+    } else {
+      next.valueType = inferred;
+      next.formula = null;
+      next.valueCalc = null;
+    }
+  }
+  return next;
+};
+
+const toCellValue = (cell: SheetCell): CellValue => {
+  const raw = coerceToString(cell.valueRaw ?? cell.valueCalc ?? "");
+  const formula = cell.formula ?? (raw.trim().startsWith("=") ? raw : null);
+  const valueType = formula ? "formula" : cell.valueType ?? inferValueType(raw);
+  return {
+    value: raw,
+    valueType,
+    formula,
+    valueCalc: coerceNullableString(cell.valueCalc),
+    formatJson: coerceNullableString(cell.formatJson),
+    styleJson: coerceNullableString(cell.styleJson),
+    note: coerceNullableString(cell.note),
+  };
+};
+
+const normalizeImportedCell = (cell: SheetImportCell): CellValue => {
+  const raw = coerceToString(cell.valueRaw ?? cell.value ?? "");
+  const formula = cell.formula ?? (raw.trim().startsWith("=") ? raw : null);
+  const valueType = formula ? "formula" : cell.valueType ?? inferValueType(raw);
+  return {
+    value: raw,
+    valueType,
+    formula,
+    valueCalc: coerceNullableString(cell.valueCalc),
+    formatJson: coerceNullableString(cell.formatJson),
+    styleJson: coerceNullableString(cell.styleJson),
+    note: coerceNullableString(cell.note),
+  };
+};
 
 const buildCellsPayload = (cells: Record<string, CellValue>): SheetCell[] =>
   Object.entries(cells)
-    .filter(([, cell]) => cell.value !== "")
+    .filter(([, cell]) => cell.value.trim() !== "" || hasPersistentMetadata(cell))
     .map(([key, cell]) => {
       const { row, col } = parseCellKey(key);
-      const trimmed = cell.value.trim();
-      const isNumeric = trimmed !== "" && !Number.isNaN(Number(trimmed));
       return {
         rowIndex: row,
         colIndex: col,
         valueRaw: cell.value,
-        valueType: isNumeric ? "number" : "text",
-        formula: null,
-        valueCalc: null,
-        formatJson: null,
-        styleJson: null,
-        note: null,
+        valueType: cell.valueType ?? (cell.formula ? "formula" : inferValueType(cell.value)),
+        formula: cell.formula,
+        valueCalc: cell.valueCalc,
+        formatJson: cell.formatJson,
+        styleJson: cell.styleJson,
+        note: cell.note,
       };
     });
 
@@ -170,11 +264,10 @@ const sanitizeColumnCount = (count: number, orientation: SheetOrientation) => {
 const toWorkingState = (sheet: SheetSummary, cells: SheetCell[]): WorkingSheet => ({
   meta: sheet,
   cells: cells.reduce<Record<string, CellValue>>((acc, cell) => {
-    if (cell.valueRaw && cell.valueRaw !== "") {
-      acc[cellKey(cell.rowIndex, cell.colIndex)] = {
-        value: cell.valueRaw,
-      };
-    }
+    const rowIndex = Number(cell.rowIndex);
+    const colIndex = Number(cell.colIndex);
+    if (!Number.isFinite(rowIndex) || !Number.isFinite(colIndex)) return acc;
+    acc[cellKey(rowIndex, colIndex)] = toCellValue(cell);
     return acc;
   }, {}),
 });
@@ -391,10 +484,11 @@ export default function LedgerSheetView({
     const draftValue = editingDraft;
     commit((draft) => {
       const key = cellKey(editingCell.row, editingCell.col);
-      if (draftValue === "") {
-        delete draft.cells[key];
+      const next = applyValueToCell(draft.cells[key], draftValue);
+      if (next) {
+        draft.cells[key] = next;
       } else {
-        draft.cells[key] = { value: draftValue };
+        delete draft.cells[key];
       }
     });
     setEditingCell(null);
@@ -434,7 +528,13 @@ export default function LedgerSheetView({
     if (!selectedCells.length) return;
     commit((draft) => {
       selectedCells.forEach(({ row, col }) => {
-        delete draft.cells[cellKey(row, col)];
+        const key = cellKey(row, col);
+        const next = applyValueToCell(draft.cells[key], "");
+        if (next) {
+          draft.cells[key] = next;
+        } else {
+          delete draft.cells[key];
+        }
       });
     });
   };
@@ -446,11 +546,12 @@ export default function LedgerSheetView({
       const newCells: Record<string, CellValue> = {};
       Object.entries(draft.cells).forEach(([key, cell]) => {
         const { row, col } = parseCellKey(key);
+        const cloned = { ...cell };
         if (row > targetRow) {
           const nextRow = row + 1;
-          newCells[cellKey(nextRow, col)] = { value: cell.value };
+          newCells[cellKey(nextRow, col)] = cloned;
         } else {
-          newCells[key] = cell;
+          newCells[key] = cloned;
         }
       });
       draft.cells = newCells;
@@ -468,11 +569,12 @@ export default function LedgerSheetView({
       const newCells: Record<string, CellValue> = {};
       Object.entries(draft.cells).forEach(([key, cell]) => {
         const { row, col } = parseCellKey(key);
+        const cloned = { ...cell };
         if (col > targetCol) {
           const nextCol = col + 1;
-          newCells[cellKey(row, nextCol)] = { value: cell.value };
+          newCells[cellKey(row, nextCol)] = cloned;
         } else {
-          newCells[key] = cell;
+          newCells[key] = cloned;
         }
       });
       draft.cells = newCells;
@@ -522,10 +624,11 @@ export default function LedgerSheetView({
           const col = activeCell.col + colOffset;
           if (row <= draft.meta.rowCount && col <= draft.meta.columnCount) {
             const key = cellKey(row, col);
-            if (value === "") {
-              delete draft.cells[key];
+            const next = applyValueToCell(draft.cells[key], value);
+            if (next) {
+              draft.cells[key] = next;
             } else {
-              draft.cells[key] = { value };
+              delete draft.cells[key];
             }
           }
         });
@@ -641,9 +744,36 @@ export default function LedgerSheetView({
       if (!parsed || typeof parsed !== "object") throw new Error("Invalid file");
       commit((draft) => {
         const nextOrientation = parsed.orientation ?? draft.meta.orientation;
-        const nextRowCount = sanitizeRowCount(parsed.rowCount ?? draft.meta.rowCount, nextOrientation);
+        const importedCells =
+          parsed.cells
+            ?.map((cell) => {
+              const rowIndex = Number(cell.rowIndex);
+              const colIndex = Number(cell.colIndex);
+              if (
+                !Number.isFinite(rowIndex) ||
+                !Number.isFinite(colIndex) ||
+                rowIndex < 1 ||
+                colIndex < 1
+              ) {
+                return null;
+              }
+              return {
+                rowIndex,
+                colIndex,
+                value: normalizeImportedCell(cell),
+              };
+            })
+            .filter(
+              (entry): entry is { rowIndex: number; colIndex: number; value: CellValue } =>
+                entry !== null
+            ) ?? [];
+        const inferredRowMax = importedCells.reduce((max, cell) => Math.max(max, cell.rowIndex), 0);
+        const inferredColMax = importedCells.reduce((max, cell) => Math.max(max, cell.colIndex), 0);
+        const baseRowCount = parsed.rowCount ?? draft.meta.rowCount;
+        const baseColumnCount = parsed.columnCount ?? draft.meta.columnCount;
+        const nextRowCount = sanitizeRowCount(Math.max(baseRowCount, inferredRowMax), nextOrientation);
         const nextColumnCount = sanitizeColumnCount(
-          parsed.columnCount ?? draft.meta.columnCount,
+          Math.max(baseColumnCount, inferredColMax),
           nextOrientation
         );
         draft.meta = {
@@ -655,11 +785,9 @@ export default function LedgerSheetView({
           columnCount: nextColumnCount,
         };
         draft.cells = {};
-        parsed.cells?.forEach((cell) => {
-          if (cell.rowIndex <= nextRowCount && cell.colIndex <= nextColumnCount) {
-            draft.cells[cellKey(cell.rowIndex, cell.colIndex)] = {
-              value: cell.value,
-            };
+        importedCells.forEach(({ rowIndex, colIndex, value }) => {
+          if (rowIndex <= nextRowCount && colIndex <= nextColumnCount) {
+            draft.cells[cellKey(rowIndex, colIndex)] = value;
           }
         });
       });
@@ -681,6 +809,13 @@ export default function LedgerSheetView({
         rowIndex: cell.rowIndex,
         colIndex: cell.colIndex,
         value: cell.valueRaw ?? "",
+        valueRaw: cell.valueRaw ?? "",
+        valueType: cell.valueType ?? null,
+        formula: cell.formula ?? null,
+        valueCalc: cell.valueCalc ?? null,
+        formatJson: cell.formatJson ?? null,
+        styleJson: cell.styleJson ?? null,
+        note: cell.note ?? null,
       })),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -903,10 +1038,11 @@ export default function LedgerSheetView({
               const value = event.target.value;
               commit((draft) => {
                 const key = cellKey(activeCell.row, activeCell.col);
-                if (value === "") {
-                  delete draft.cells[key];
+                const next = applyValueToCell(draft.cells[key], value);
+                if (next) {
+                  draft.cells[key] = next;
                 } else {
-                  draft.cells[key] = { value };
+                  delete draft.cells[key];
                 }
               });
             }}

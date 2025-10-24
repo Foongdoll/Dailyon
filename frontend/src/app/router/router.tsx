@@ -38,7 +38,7 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />, // Outlet 보호
         children: [
           { path: "notes", element: withSuspense(<NotesPage />) },
-          { path: "notes/:id", element: withSuspense(<NoteDetail />) },
+          { path: "notes/detail/:id", element: withSuspense(<NoteDetail />) },
           { path: "planner", element: withSuspense(<PlannerPage />) },
           { path: "planner/:date", element: withSuspense(<PlannerDayPage />) },
           { path: "ledger", element: withSuspense(<LedgerPage />) },

@@ -3,3 +3,12 @@ export type UserSummary = {
   nickname: string | null;
   email: string;
 };
+
+export type UserProfile = {
+  id: number;
+  username: string;
+  email: string;
+  nickname: string | null;
+  roles: string[];
+  enabled: boolean;
+};

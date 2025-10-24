@@ -16,7 +16,7 @@ import {
   deleteSheet,
   fetchSheets,
 } from "../../shared/api/ledgerApi";
-import type { SheetSummary, SheetSavePayload, SheetOrientation } from "../../shared/types/ledger";
+import type { SheetSummary, SheetSavePayload, SheetOrientation, SheetPage } from "../../shared/types/ledger";
 import SheetFormDialog, { type SheetFormValues } from "./components/SheetFormDialog";
 
 const PAGE_SIZE = 10;
@@ -46,10 +46,10 @@ export default function LedgerSheetList({ ownerId, onOpen }: LedgerSheetListProp
   const [showCreate, setShowCreate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const sheetQuery = useQuery({
+  const sheetQuery = useQuery<SheetPage>({
     queryKey: ["ledger", "list", ownerId, page, keyword],
     queryFn: () => fetchSheets({ ownerId, page, size: PAGE_SIZE, title: keyword }),
-    keepPreviousData: true,
+    placeholderData: (previousData: SheetPage | undefined) => previousData,
   });
 
   const createMutation = useMutation({
@@ -126,7 +126,7 @@ export default function LedgerSheetList({ ownerId, onOpen }: LedgerSheetListProp
   const data = sheetQuery.data;
   const totalPages = data?.totalPages ?? 1;
   const totalRows = data?.totalElements ?? 0;
-  const rows = data?.content ?? [];
+  const rows: SheetSummary[] = data?.content ?? [];
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setKeyword(event.target.value);

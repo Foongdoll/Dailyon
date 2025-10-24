@@ -24,7 +24,7 @@ export type NoteLayout = {
 
 export type Note = {
   id: number;
-  categoryId: number;
+  category_id: number;
   categoryName: string;
   title: string;
   content: string | null;
@@ -34,8 +34,8 @@ export type Note = {
   fields: Record<string, unknown>;
   layout: NoteLayout | null;
   position: number;
-  createdAt: string | null;
-  updatedAt: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 export type NotePage = {

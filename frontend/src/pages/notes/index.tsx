@@ -9,7 +9,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { Loader2, Plus, Search, Settings2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import {
   createCategory,
@@ -32,6 +32,7 @@ import CategoryManager from "./components/CategoryManager";
 import NoteDialog from "./components/NoteDialog";
 import Pagination from "./components/Pagination";
 import { SortableNoteCard } from "./components/NoteCard";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const PAGE_SIZE = 10;
 const defaultLayoutForIndex = (index: number) => ({
@@ -42,12 +43,28 @@ const defaultLayoutForIndex = (index: number) => ({
 });
 
 export default function NotesIndex() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [page, setPage] = useState(0);
-  const [search, setSearch] = useState("");
+  const parseCategoryParam = (value: string | null): number | null => {
+    if (value == null) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const parsePageParam = (value: string | null): number => {
+    if (value == null) return 0;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) || parsed < 0 ? 0 : parsed;
+  };
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(() =>
+    parseCategoryParam(searchParams.get("cat"))
+  );
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const deferredSearch = useDeferredValue(search);
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -62,10 +79,12 @@ export default function NotesIndex() {
 
   useEffect(() => {
     if (!categoriesQuery.data?.length) return;
-    if (!selectedCategoryId) {
+    if (selectedCategoryId == null) {
       setSelectedCategoryId(categoriesQuery.data[0].id);
+      setPage(0);
     } else if (!categoriesQuery.data.some((cat) => cat.id === selectedCategoryId)) {
       setSelectedCategoryId(categoriesQuery.data[0].id);
+      setPage(0);
     }
   }, [categoriesQuery.data, selectedCategoryId]);
 
@@ -88,9 +107,44 @@ export default function NotesIndex() {
     }
   }, [notesQuery.data]);
 
+  const searchParamsString = searchParams.toString();
+
   useEffect(() => {
-    setPage(0);
-  }, [selectedCategoryId, deferredSearch]);
+    const existingCategory = parseCategoryParam(searchParams.get("cat"));
+    if (existingCategory !== selectedCategoryId) {
+      setSelectedCategoryId(existingCategory);
+    }
+    const existingPage = parsePageParam(searchParams.get("page"));
+    if (existingPage !== page) {
+      setPage(existingPage);
+    }
+    const existingSearch = searchParams.get("q") ?? "";
+    if (existingSearch !== search) {
+      setSearch(existingSearch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParamsString]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParamsString);
+    if (selectedCategoryId != null) {
+      nextParams.set("cat", String(selectedCategoryId));
+    } else {
+      nextParams.delete("cat");
+    }
+    nextParams.set("page", String(page));
+    if (search) {
+      nextParams.set("q", search);
+    } else {
+      nextParams.delete("q");
+    }
+
+    const nextString = nextParams.toString();
+    if (nextString !== searchParamsString) {
+      setSearchParams(nextParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategoryId, page, search, searchParamsString]);
 
   const layoutMutation = useMutation({
     mutationFn: (payload: LayoutUpdatePayload[]) => updateNoteLayouts(payload),
@@ -124,6 +178,24 @@ export default function NotesIndex() {
       queryClient.invalidateQueries({ queryKey: ["notes", selectedCategoryId] });
     },
   });
+
+
+
+  const handleCategoryChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const { value } = event.target;
+    if (value === "") {
+      setSelectedCategoryId(null);
+    } else {
+      const parsed = Number.parseInt(value, 10);
+      setSelectedCategoryId(Number.isNaN(parsed) ? null : parsed);
+    }
+    setPage(0);
+  };
+
+  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setSearch(event.target.value);
+    setPage(0);
+  };
 
   const createCategoryMutation = useMutation({
     mutationFn: createCategory,
@@ -181,6 +253,18 @@ export default function NotesIndex() {
     deleteNoteMutation.mutate(note.id);
   };
 
+  const handleDetail = (note: Note) => {
+    navigate(`/notes/detail/${note.id}`, {
+      state: {
+        categoryFields: selectedCategory?.fields ?? [],
+        categoryId: selectedCategoryId,
+        page,
+        search,
+      },
+      preventScrollReset: true,
+    });
+  }
+
   const selectedCategory = useMemo(
     () => categoriesQuery.data?.find((category) => category.id === selectedCategoryId),
     [categoriesQuery.data, selectedCategoryId]
@@ -206,7 +290,7 @@ export default function NotesIndex() {
               <Search className="h-4 w-4 text-slate-400" />
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={handleSearchChange}
                 type="search"
                 placeholder="제목, 내용, 필드 값으로 검색"
                 className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none"
@@ -215,10 +299,10 @@ export default function NotesIndex() {
             <div className="flex flex-1 items-center gap-3">
               <select
                 value={selectedCategoryId ?? ""}
-                onChange={(e) => setSelectedCategoryId(Number(e.target.value))}
+                onChange={handleCategoryChange}
                 className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-sky-500 focus:outline-none"
               >
-                <option className="text-black" value={0}>- 선택 -</option>
+                <option className="text-black" value="">- 선택 -</option>
                 {categoriesQuery.data?.map((category) => (
                   <option className="text-black" key={category.id} value={category.id}>
                     {category.name}
@@ -304,6 +388,7 @@ export default function NotesIndex() {
                       setNoteModalOpen(true);
                     }}
                     onDelete={handleDeleteNote}
+                    onDetail={handleDetail}
                   />
                 ))}
               </div>

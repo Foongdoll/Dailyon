@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Pin, Trash2 } from "lucide-react";
+import { GripVertical, Notebook, Pencil, Pin, Trash2 } from "lucide-react";
 import type { Note, NoteCategoryField } from "../../../shared/types/note";
 
 export type SortableNoteCardProps = {
@@ -8,6 +8,7 @@ export type SortableNoteCardProps = {
   fields: NoteCategoryField[];
   onEdit: (note: Note) => void;
   onDelete: (note: Note) => void;
+  onDetail: (note: Note) => void;
 };
 
 const formatFieldValue = (field: NoteCategoryField, raw: unknown) => {
@@ -21,7 +22,7 @@ const formatFieldValue = (field: NoteCategoryField, raw: unknown) => {
   return String(raw);
 };
 
-export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNoteCardProps) {
+export function SortableNoteCard({ note, fields, onEdit, onDelete, onDetail }: SortableNoteCardProps) {
   const {
     attributes,
     listeners,
@@ -53,7 +54,7 @@ export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNot
 
   return (
     <article
-      ref={setNodeRef}
+      ref={setNodeRef}      
       style={style}
       className={`group relative rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-lg shadow-slate-950/30 transition hover:border-sky-400/60 hover:bg-slate-900/90 ${
         isDragging ? "z-10 ring-2 ring-sky-500" : ""
@@ -79,10 +80,17 @@ export function SortableNoteCard({ note, fields, onEdit, onDelete }: SortableNot
           </h2>
           <p className="text-xs text-slate-400">
             {note.categoryName} ·{" "}
-            {note.updatedAt ? new Date(note.updatedAt).toLocaleString() : "작성 중"}
+            {note.updated_at ? new Date(note.updated_at).toLocaleString() : "작성 중"}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => onDetail(note)}
+            className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 hover:text-sky-300"
+            title="상세보기"
+          >
+            <Notebook className="h-4 w-4" />
+          </button>
           <button
             ref={setActivatorNodeRef}
             {...listeners}
