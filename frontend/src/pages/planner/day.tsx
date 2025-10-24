@@ -36,7 +36,7 @@ export default function PlannerDayPage() {
     queryFn: () => fetchPlannerEvents({ startDate: dateKey, endDate: dateKey }),
   });
 
-  const events = eventsQuery.data ?? [];
+  const events = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
 
   const eventsForDay = useMemo(
     () => events.filter((event) => event.startDate <= dateKey && event.endDate >= dateKey),
